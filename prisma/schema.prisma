@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          String    @default("USER")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  testSessions  TestSession[]
+  testResults   TestResult[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Question {
+  id            String   @id @default(cuid())
+  subject       String   // "math" or "reading"
+  category      String   // "Algebra", "Reading Comprehension", etc.
+  subcategory   String   // "Linear Equations", "Literature", etc.
+  difficulty    Int      // 1-5 scale
+  estimatedTime Int      // seconds
+  passage       String?  // For reading questions
+  question      String   @db.Text
+  choiceA       String   @db.Text
+  choiceB       String   @db.Text
+  choiceC       String   @db.Text
+  choiceD       String   @db.Text
+  correctAnswer String   // "A", "B", "C", or "D"
+  explanationA  String   @db.Text
+  explanationB  String   @db.Text
+  explanationC  String   @db.Text
+  explanationD  String   @db.Text
+  solution      String   @db.Text
+  hints         String[] // Array of hints
+  skills        String[] // Array of skills tested
+  tags          String[] // Array of tags
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  responses     QuestionResponse[]
+}
+
+model TestSession {
+  id              String   @id @default(cuid())
+  userId          String
+  testType        String   // "FULL_TEST", "MATH_ONLY", "READING_ONLY"
+  status          String   // "IN_PROGRESS", "COMPLETED", "ABANDONED"
+  currentSection  String?  // "READING_MODULE_1", "READING_MODULE_2", "BREAK", "MATH_MODULE_1", "MATH_MODULE_2"
+  currentQuestion Int      @default(0)
+  startTime       DateTime @default(now())
+  endTime         DateTime?
+  totalScore      Int?     // Out of 1600
+  readingScore    Int?     // Out of 800
+  mathScore       Int?     // Out of 800
+  
+  // Module-specific data
+  readingModule1Score    Int?
+  readingModule1Time     Int? // seconds
+  readingModule2Score    Int?
+  readingModule2Time     Int? // seconds
+  mathModule1Score       Int?
+  mathModule1Time        Int? // seconds
+  mathModule2Score       Int?
+  mathModule2Time        Int? // seconds
+  
+  // Adaptive testing data
+  readingModule1Performance String? // "LOW", "MEDIUM", "HIGH"
+  mathModule1Performance    String? // "LOW", "MEDIUM", "HIGH"
+  
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  responses       QuestionResponse[]
+  result          TestResult?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model QuestionResponse {
+  id              String   @id @default(cuid())
+  testSessionId   String
+  questionId      String
+  selectedAnswer  String?  // "A", "B", "C", "D", or null if skipped
+  isCorrect       Boolean?
+  timeSpent       Int      // seconds
+  hintsUsed       Int      @default(0)
+  module          String   // "READING_MODULE_1", "READING_MODULE_2", "MATH_MODULE_1", "MATH_MODULE_2"
+  questionOrder   Int      // Order within the module
+  
+  testSession     TestSession @relation(fields: [testSessionId], references: [id], onDelete: Cascade)
+  question        Question    @relation(fields: [questionId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([testSessionId, questionId])
+}
+
+model TestResult {
+  id                    String   @id @default(cuid())
+  userId                String
+  testSessionId         String   @unique
+  totalScore            Int      // Out of 1600
+  readingScore          Int      // Out of 800
+  mathScore             Int      // Out of 800
+  
+  // Detailed breakdown
+  readingCorrect        Int
+  readingIncorrect      Int
+  readingSkipped        Int
+  mathCorrect           Int
+  mathIncorrect         Int
+  mathSkipped           Int
+  
+  // Time analysis
+  totalTimeSpent        Int      // seconds
+  readingTimeSpent      Int      // seconds
+  mathTimeSpent         Int      // seconds
+  
+  // Performance by category
+  categoryPerformance   Json     // Detailed breakdown by category/subcategory
+  
+  // Recommendations
+  strengthAreas         String[] // Areas where student performed well
+  improvementAreas      String[] // Areas needing improvement
+  recommendedStudyPlan  Json?    // Personalized study recommendations
+  
+  user                  User        @relation(fields: [userId], references: [id])
+  testSession           TestSession @relation(fields: [testSessionId], references: [id])
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
