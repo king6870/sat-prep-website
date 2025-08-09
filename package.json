@@ -13,7 +13,9 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:init": "node scripts/init-db.js",
-    "db:seed": "node scripts/init-db.js"
+    "db:seed": "node scripts/init-db.js",
+    "db:setup": "prisma db push && node scripts/init-db.js",
+    "migrate": "node scripts/migrate-db.js"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
